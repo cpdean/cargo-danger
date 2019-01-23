@@ -9,3 +9,8 @@ repository = "https://github.com/cpdean/cargo-danger"
 readme = "README.md"
 
 [dependencies]
+cargo = "0.32"
+env_logger = "0.6"
+failure = "0.1"
+petgraph = "0.4"
+structopt = "0.2"
