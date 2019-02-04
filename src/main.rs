@@ -5,6 +5,9 @@ use cargo::ops;
 use cargo::util::CargoResult;
 use cargo::Config;
 
+use std::fs::File;
+use std::io::Read;
+
 use std::collections::HashSet;
 
 use cargo::util::important_paths::find_root_manifest_for_wd;
@@ -33,7 +36,7 @@ fn main() {
             for p in packs {
                 let UnsafeLines { package, lines } = p;
                 let name = package.package_id().name();
-                println!("{}, {}", name, lines);
+                //println!("{}, {}", name, lines);
             }
         }
         Err(err) => {
@@ -48,8 +51,10 @@ fn print_files(config: &mut Config) -> Result<Vec<UnsafeLines>> {
     let root = resolve_roots(config)?;
     let mut packages = vec![];
     let _packages = resolve_packages(config, root)?;
+    let mut open_files = true;
     for p in _packages {
-        let things = count_of_unsafe(&p)?;
+        let things = count_of_unsafe(&p, open_files)?;
+        open_files = false;
         packages.push(UnsafeLines {
             package: p,
             lines: things,
@@ -58,10 +63,39 @@ fn print_files(config: &mut Config) -> Result<Vec<UnsafeLines>> {
     Ok(packages)
 }
 
-fn count_of_unsafe(package: &Package) -> Result<usize> {
+fn count_of_unsafe(package: &Package, open_files: bool) -> Result<usize> {
     let mut unsafe_total = 0;
-    for _f in files_of(package.root())? {
-        unsafe_total += 1;
+    for f in files_of(package.root())? {
+        if let Some(ext) = f.extension() {
+            if ext == "rs" {
+                if open_files {
+                    let mut file = File::open(dbg!(f))?;
+                    let mut content = String::new();
+                    file.read_to_string(&mut content)?;
+                    let ast = syn::parse_file(&content)?;
+                    let just_functions = ast
+                        .items
+                        .iter()
+                        .filter(|item| match item {
+                            syn::Item::Fn(_item_fn) => true,
+                            _ => false,
+                        })
+                        .collect::<Vec<_>>();
+                    for i in just_functions {
+                        match i {
+                            syn::Item::Fn(item_fn) => {
+                                println!("item function {:?}", item_fn.ident.to_string());
+                            }
+                            _ => {
+                                // ..
+                            }
+                        }
+                    }
+                }
+                //dbg!(f);
+                unsafe_total += 1;
+            }
+        }
     }
     // start with just counting files
     Ok(unsafe_total)
