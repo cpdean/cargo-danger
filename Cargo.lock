@@ -126,7 +126,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-danger"
-version = "0.1.0"
+version = "0.2.1"
 dependencies = [
  "cargo 0.32.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
