@@ -1,9 +1,9 @@
-Cargo Danger (work in progress)
+## `danger`
 
 A utility for exploring a crate's dependencies.
 
 
-Danger lets you know which of your projects dependencies relies on `unsafe`
+`danger` lets you know which of your projects dependencies relies on `unsafe`
 code, giving you a count of lines that fall under `unsafe fn` definitions, or
 `unsafe` blocks within a function definition.
 
