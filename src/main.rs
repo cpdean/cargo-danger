@@ -34,35 +34,36 @@ struct UnsafeLines {
 }
 
 fn main() -> Result<()> {
+    // cli arg handling will be done by hand and is a little spotty because of how
+    // cargo invokes a cargo-* binary
     let argv: Vec<_> = env::args().collect();
+    // going to use a trick I've seen in other cargo cli extensions and force
+    // users to always have the second arg be the tool's name
     if argv.len() == 1 {
-        // by default cargo-danger will warn you of unsafe lines of code in your
-        // project's dependencies
-        let mut config = Config::default().expect("No idea why this would fail");
-        let result = print_files(&mut config);
-        dbg!("got some packages");
-        match result {
-            Ok(packs) => {
-                for p in packs {
-                    let UnsafeLines { package, lines } = p;
-                    let name = package.package_id().name();
-                    if lines > 0 {
-                        println!("{}, {}", name, lines);
-                    }
+        panic!(
+            "run tool with \"{} danger\" or \"{} danger PATH\"",
+            argv[0], argv[0]
+        );
+    } else if argv.len() == 2 {
+        if argv[1] == "danger" {
+            let mut config = Config::default().expect("No idea why this would fail");
+            let packs = print_files(&mut config)?;
+            for p in packs {
+                let UnsafeLines { package, lines } = p;
+                let name = package.package_id().name();
+                if lines > 0 {
+                    println!("{}, {}", name, lines);
                 }
             }
-            Err(err) => {
-                // maybe exit_with_error is best but i cannot find the way to get it to work now
-                //cargo::exit_with_error(err, &mut *config.shell());
-                panic!("dunno {:?}", err);
-            }
+        } else {
+            panic!(
+                "run tool with \"{} danger\" or \"{} danger PATH\"",
+                argv[0], argv[0]
+            );
         }
-    } else {
-        // if you want to inspect a specific directory
-        println!(
-            "{} unsafe lines",
-            count_of_unsafe(Path::new(&argv[1]), true)?
-        );
+    } else if argv.len() == 3 {
+        let path = &argv[2];
+        println!("{} unsafe lines", count_of_unsafe(Path::new(path), true)?);
     }
     Ok(())
 }
@@ -109,12 +110,12 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             let right = unsafe_things_of_expression(&in_place_expr.value, in_unsafe_block);
             left + right
         }
-        Expr::Array(array_exp) => {
+        Expr::Array(_array_exp) => {
             // TODO: i'm not sure how to accumulate individual potential expressions
             // in here so i'm just going to count an array expression as one.
             count_if_in(in_unsafe_block)
         }
-        Expr::Call(expr) => {
+        Expr::Call(_expr) => {
             /*
             /// A function call expression: `invoke(a, b)`.
             ///
@@ -129,7 +130,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             */
             count_if_in(in_unsafe_block)
         }
-        Expr::MethodCall(expr) => {
+        Expr::MethodCall(_expr) => {
             /*
             /// A method call expression: `x.foo::<T>(a, b)`.
             ///
@@ -146,7 +147,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             */
             count_if_in(in_unsafe_block)
         }
-        Expr::Tuple(expr) => {
+        Expr::Tuple(_expr) => {
             /*
             /// A tuple expression: `(a, b, c, d)`.
             ///
@@ -159,7 +160,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             */
             count_if_in(in_unsafe_block)
         }
-        Expr::Binary(expr) => {
+        Expr::Binary(_expr) => {
             /*
             /// A binary operation: `a + b`, `a * b`.
             ///
@@ -175,7 +176,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             count_if_in(in_unsafe_block)
         }
 
-        Expr::Unary(expr) => {
+        Expr::Unary(_expr) => {
             /*
             /// A unary operation: `!x`, `*x`.
             ///
@@ -190,7 +191,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             count_if_in(in_unsafe_block)
         }
 
-        Expr::Lit(expr) => {
+        Expr::Lit(_expr) => {
             /*
             /// A literal in place of an expression: `1`, `"foo"`.
             ///
@@ -204,7 +205,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             count_if_in(in_unsafe_block)
         }
 
-        Expr::Cast(expr) => {
+        Expr::Cast(_expr) => {
             /*
             /// A cast expression: `foo as f64`.
             ///
@@ -220,7 +221,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             count_if_in(in_unsafe_block)
         }
 
-        Expr::Type(expr) => {
+        Expr::Type(_expr) => {
             /*
             /// A type ascription expression: `foo: f64`.
             ///
@@ -235,7 +236,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             count_if_in(in_unsafe_block)
         }
 
-        Expr::Let(expr) => {
+        Expr::Let(_expr) => {
             /*
             /// A `let` guard: `let Some(x) = opt`.
             ///
@@ -261,7 +262,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
                 None => cond_result + then_branch,
             }
         }
-        Expr::While(expr) => {
+        Expr::While(_expr) => {
             /*
             /// A while loop: `while expr { ... }`.
             ///
@@ -277,7 +278,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             count_if_in(in_unsafe_block)
         }
 
-        Expr::ForLoop(expr) => {
+        Expr::ForLoop(_expr) => {
             /*
             /// A for loop: `for pat in expr { ... }`.
             ///
@@ -295,7 +296,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             count_if_in(in_unsafe_block)
         }
 
-        Expr::Loop(expr) => {
+        Expr::Loop(_expr) => {
             /*
             /// Conditionless loop: `loop { ... }`.
             ///
@@ -310,7 +311,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             count_if_in(in_unsafe_block)
         }
 
-        Expr::Match(expr) => {
+        Expr::Match(_expr) => {
             /*
             /// A `match` expression: `match n { Some(n) => {}, None => {} }`.
             ///
@@ -326,7 +327,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             count_if_in(in_unsafe_block)
         }
 
-        Expr::Closure(expr) => {
+        Expr::Closure(_expr) => {
             /*
             /// A closure expression: `|a, b| a + b`.
             ///
@@ -382,7 +383,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             total
         }
 
-        Expr::Assign(expr) => {
+        Expr::Assign(_expr) => {
             /*
             /// An assignment expression: `a = compute()`.
             ///
@@ -397,7 +398,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             count_if_in(in_unsafe_block)
         }
 
-        Expr::AssignOp(expr) => {
+        Expr::AssignOp(_expr) => {
             /*
             /// A compound assignment expression: `counter += 1`.
             ///
@@ -412,7 +413,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             count_if_in(in_unsafe_block)
         }
 
-        Expr::Field(expr) => {
+        Expr::Field(_expr) => {
             /*
             /// Access of a named struct field (`obj.k`) or unnamed tuple struct
             /// field (`obj.0`).
@@ -428,7 +429,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             count_if_in(in_unsafe_block)
         }
 
-        Expr::Index(expr) => {
+        Expr::Index(_expr) => {
             /*
             /// A square bracketed indexing expression: `vector[2]`.
             ///
@@ -445,7 +446,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             count_if_in(in_unsafe_block)
         }
 
-        Expr::Range(expr) => {
+        Expr::Range(_expr) => {
             /*
             /// A range expression: `1..2`, `1..`, `..2`, `1..=2`, `..=2`.
             ///
@@ -460,7 +461,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             count_if_in(in_unsafe_block)
         }
 
-        Expr::Path(expr) => {
+        Expr::Path(_expr) => {
             /*
             /// A path like `std::mem::replace` possibly containing generic
             /// parameters and a qualified self-type.
@@ -478,7 +479,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             count_if_in(in_unsafe_block)
         }
 
-        Expr::Reference(expr) => {
+        Expr::Reference(_expr) => {
             /*
             /// A referencing operation: `&a` or `&mut a`.
             ///
@@ -493,7 +494,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             count_if_in(in_unsafe_block)
         }
 
-        Expr::Break(expr) => {
+        Expr::Break(_expr) => {
             /*
             /// A `break`, with an optional label to break and an optional
             /// expression.
@@ -509,7 +510,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             count_if_in(in_unsafe_block)
         }
 
-        Expr::Continue(expr) => {
+        Expr::Continue(_expr) => {
             /*
             /// A `continue`, with an optional label.
             ///
@@ -523,7 +524,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             count_if_in(in_unsafe_block)
         }
 
-        Expr::Return(expr) => {
+        Expr::Return(_expr) => {
             /*
             /// A `return`, with an optional value to be returned.
             ///
@@ -537,7 +538,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             count_if_in(in_unsafe_block)
         }
 
-        Expr::Macro(expr) => {
+        Expr::Macro(_expr) => {
             /*
             /// A macro invocation expression: `format!("{}", q)`.
             ///
@@ -550,7 +551,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             count_if_in(in_unsafe_block)
         }
 
-        Expr::Struct(expr) => {
+        Expr::Struct(_expr) => {
             /*
             /// A struct literal expression: `Point { x: 1, y: 1 }`.
             ///
@@ -570,7 +571,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             count_if_in(in_unsafe_block)
         }
 
-        Expr::Repeat(expr) => {
+        Expr::Repeat(_expr) => {
             /*
             /// An array literal constructed from one repeated element: `[0u8; N]`.
             ///
@@ -586,7 +587,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             count_if_in(in_unsafe_block)
         }
 
-        Expr::Paren(expr) => {
+        Expr::Paren(_expr) => {
             /*
             /// A parenthesized expression: `(a + b)`.
             ///
@@ -600,7 +601,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             count_if_in(in_unsafe_block)
         }
 
-        Expr::Group(expr) => {
+        Expr::Group(_expr) => {
             /*
             /// An expression contained within invisible delimiters.
             ///
@@ -618,7 +619,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             count_if_in(in_unsafe_block)
         }
 
-        Expr::Try(expr) => {
+        Expr::Try(_expr) => {
             /*
             /// A try-expression: `expr?`.
             ///
@@ -632,7 +633,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             count_if_in(in_unsafe_block)
         }
 
-        Expr::Async(expr) => {
+        Expr::Async(_expr) => {
             /*
             /// An async block: `async { ... }`.
             ///
@@ -647,7 +648,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             count_if_in(in_unsafe_block)
         }
 
-        Expr::TryBlock(expr) => {
+        Expr::TryBlock(_expr) => {
             /*
             /// A try block: `try { ... }`.
             ///
@@ -661,7 +662,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             count_if_in(in_unsafe_block)
         }
 
-        Expr::Yield(expr) => {
+        Expr::Yield(_expr) => {
             /*
             /// A yield expression: `yield expr`.
             ///
@@ -675,7 +676,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
             count_if_in(in_unsafe_block)
         }
 
-        Expr::Verbatim(expr) => {
+        Expr::Verbatim(_expr) => {
             /*
             /// Tokens in expression position not interpreted by Syn.
             ///
@@ -693,7 +694,7 @@ fn unsafe_things_of_expression(expr: &syn::Expr, in_unsafe_block: bool) -> usize
 
 fn unsafe_things_of_statement(item: &syn::Stmt, in_unsafe_block: bool) -> usize {
     match item {
-        syn::Stmt::Local(local) => count_if_in(in_unsafe_block),
+        syn::Stmt::Local(_local) => count_if_in(in_unsafe_block),
         syn::Stmt::Expr(_expr_statement) => {
             unsafe_things_of_expression(&_expr_statement, in_unsafe_block)
         }
@@ -798,12 +799,18 @@ fn count_of_unsafe(root_dir: &Path, open_files: bool) -> Result<usize> {
             if ext == "rs" {
                 if open_files {
                     //let mut file = File::open(dbg!(f))?;
-                    let mut file = File::open(f)?;
+                    let mut file = File::open(&f)?;
                     let mut content = String::new();
                     file.read_to_string(&mut content)?;
-                    let ast = syn::parse_file(&content)?;
-                    let unsafe_lines = unsafe_lines_of_file(&ast);
-                    unsafe_total += unsafe_lines;
+                    match syn::parse_file(&content) {
+                        Ok(ast) => {
+                            let unsafe_lines = unsafe_lines_of_file(&ast);
+                            unsafe_total += unsafe_lines;
+                        }
+                        Err(_err) => {
+                            eprintln!("error parsing {:?}", f);
+                        }
+                    }
                 }
             }
         }
