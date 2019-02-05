@@ -10,8 +10,8 @@ code, giving you a count of lines that fall under `unsafe fn` definitions, or
 ### Installation
 
 Currently `danger` can only be compiled from crates.io for installation.  You
-will need cargo installed a rust toolchain.  Fortunately, this is a tool for
-rust programmers, so if you want to use `danger` you probably have everything
+will need cargo installed and a rust toolchain.  Fortunately this is a tool for
+Rust programmers, so if you want to use `danger` you probably have everything
 you need already:
 
 ```
