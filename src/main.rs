@@ -5,7 +5,6 @@ use cargo::ops;
 use cargo::util::CargoResult;
 use cargo::Config;
 
-use std::env;
 use std::path::Path;
 use syn::Item;
 
@@ -15,6 +14,8 @@ use std::io::Read;
 use std::collections::HashSet;
 
 use cargo::util::important_paths::find_root_manifest_for_wd;
+
+use clap::{App, Arg, SubCommand};
 
 type Result<T> = std::result::Result<T, Box<std::error::Error>>;
 
@@ -33,19 +34,27 @@ struct UnsafeLines {
     lines: usize,
 }
 
-fn main() -> Result<()> {
-    // cli arg handling will be done by hand and is a little spotty because of how
-    // cargo invokes a cargo-* binary
-    let argv: Vec<_> = env::args().collect();
-    // going to use a trick I've seen in other cargo cli extensions and force
-    // users to always have the second arg be the tool's name
-    if argv.len() == 1 {
-        panic!(
-            "run tool with \"{} danger\" or \"{} danger PATH\"",
-            argv[0], argv[0]
-        );
-    } else if argv.len() == 2 {
-        if argv[1] == "danger" {
+fn parse_input() -> Result<()> {
+    let matches = App::new("cargo-danger")
+        .version("1.0")
+        .about("Detect unsafe code")
+        .subcommand(
+            SubCommand::with_name("danger").arg(
+                Arg::with_name("directory")
+                    .short("d")
+                    .value_name("DIRECTORY")
+                    .takes_value(true)
+                    .help("search directory for unsafe lines"),
+            ),
+        )
+        .get_matches();
+
+    if let Some(matches) = matches.subcommand_matches("danger") {
+        if matches.is_present("directory") {
+            // if directory option was used.
+            let path = matches.value_of("directory").unwrap();
+            println!("{} unsafe lines", count_of_unsafe(Path::new(path), true)?);
+        } else {
             let mut config = Config::default().expect("No idea why this would fail");
             let packs = print_files(&mut config)?;
             for p in packs {
@@ -55,17 +64,15 @@ fn main() -> Result<()> {
                     println!("{}, {}", name, lines);
                 }
             }
-        } else {
-            panic!(
-                "run tool with \"{} danger\" or \"{} danger PATH\"",
-                argv[0], argv[0]
-            );
         }
-    } else if argv.len() == 3 {
-        let path = &argv[2];
-        println!("{} unsafe lines", count_of_unsafe(Path::new(path), true)?);
+    } else {
+        panic!("run tool with \"cargo danger\" or \"cargo danger PATH\"");
     }
     Ok(())
+}
+
+fn main() -> Result<()> {
+    parse_input()
 }
 
 fn print_files(config: &mut Config) -> Result<Vec<UnsafeLines>> {
